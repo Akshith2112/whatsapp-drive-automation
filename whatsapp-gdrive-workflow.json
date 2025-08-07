@@ -1,0 +1,394 @@
+{
+  "name": "My workflow 4",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-gdrive",
+        "options": {}
+      },
+      "id": "f0d118c1-2fea-403d-975d-270a332b6818",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-864, 256],
+      "webhookId": "e6022fb0-989e-469c-aefc-2eba50a753c6"
+    },
+    {
+      "parameters": {
+        "functionCode": "const text = $json.body?.Body?.trim() || \"\";\nconst from = ($json.body?.From || \"\").replace(/(\\r\\n|\\n|\\r)/gm,\"\").trim();\nconst parts = text.split(/\\s+/);\nreturn [{ command: parts[0]?.toUpperCase()||\"\", arg: parts.slice(1).join(\" \")||\"\", raw:text, user:from }];"
+      },
+      "id": "9047e542-305f-433e-9014-95920391b227",
+      "name": "Parse Command",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [-624, 256]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.command }}",
+        "rules": { "rules": [
+          { "value2": "LIST", "outputKey": "1" },
+          { "value2": "HELP", "outputKey": "2" },
+          { "value2": "MOVE", "outputKey": "3" },
+          { "value2": "DELETE", "outputKey": "4" },
+          { "value2": "CONFIRM", "outputKey": "5" },
+          { "value2": "SUMMARY", "outputKey": "6" }
+        ]}
+      },
+      "id": "784412a0-b336-4648-8e01-1380224fa6ea",
+      "name": "Command Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 2,
+      "position": [-336, 256]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "list",
+        "limit": 1000,
+        "options": {}
+      },
+      "id": "33c60a78-b50a-4cfd-b25f-1c9468843da0",
+      "name": "List Files (Drive)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [-80, 48],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "__REPLACE_WITH_YOUR_DRIVE_ID__",
+          "name": "__REPLACE_WITH_DRIVE_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Get the files array\nconst filesArray = $items(\"List Files (Drive)\", 0, 0).map(f => f.json.name);\nconst topFiles = filesArray.slice(0, 10);\nlet listStr = topFiles.join('\\n');\nif (filesArray.length > 10) {\n  listStr += `\\n...and ${filesArray.length - 10} more files omitted.`;\n}\nconst user = $node[\"Parse Command\"].json.user;\nreturn [{ reply: listStr || 'No files found.', user: user }];"
+      },
+      "id": "a28d5bfb-5fad-4bb0-bcf2-bc7fda7cd8d9",
+      "name": "Format List Reply",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [160, 48]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ reply: 'Commands:\\nLIST /folder\\nMOVE src-file-id dest-folder-id\\nDELETE /folder/filename\\nCONFIRM DELETE /folder/filename\\nSUMMARY /folder/filename\\nHELP', user: $json.user }];"
+      },
+      "id": "fa3e9082-3996-445b-9537-ebb3599de0ca",
+      "name": "Help Reply",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [-80, 176]
+    },
+    {
+      "parameters": {
+        "functionCode": "const [src,dest] = $json.arg.split(' ');\nreturn [{ srcRaw:src, destRaw:dest, user:$json.user }];"
+      },
+      "id": "5afd9a33-f93b-4ec1-b69a-9c40d097538a",
+      "name": "Parse Move Args",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [-80, 256]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "list",
+        "options": {}
+      },
+      "id": "a40f45b8-0dee-44eb-865f-ea1d6f1f5688",
+      "name": "Find File for Move",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [160, 256],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "__REPLACE_WITH_YOUR_DRIVE_ID__",
+          "name": "__REPLACE_WITH_DRIVE_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "update",
+        "fileId": "={{ $items(\"Find File for Move\",0,0)[0]?.json.id || '' }}",
+        "updateFields": {},
+        "options": {}
+      },
+      "id": "5de27dd6-44e4-4497-95e9-ff0176bd18ac",
+      "name": "Move File (GDrive)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [384, 256],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "__REPLACE_WITH_YOUR_DRIVE_ID__",
+          "name": "__REPLACE_WITH_DRIVE_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ reply:'Moved file!',user:$json.user }];"
+      },
+      "id": "ca20d182-a26f-41db-8737-f1bedb3d9ff0",
+      "name": "Move Reply",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [608, 256]
+    },
+    {
+      "parameters": {
+        "functionCode": "const [folder,...fnameArr]=($json.arg||'').split('/').filter(Boolean);\nconst fname=fnameArr.join('/');\nreturn [{ folder, fname, user:$json.user }];"
+      },
+      "id": "48db7f6c-01e6-4cc6-9df1-46f6617a147f",
+      "name": "Parse Delete",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [-80, 368]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "list",
+        "options": {}
+      },
+      "id": "5a5c8cf4-6892-40d9-bee7-8f9fbab23a04",
+      "name": "Find File for Delete",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [160, 368],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "__REPLACE_WITH_YOUR_DRIVE_ID__",
+          "name": "__REPLACE_WITH_DRIVE_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const fileId = $items(\"Find File for Delete\",0,0)[0]?.json.id || '';\nconst fname = $items(\"Find File for Delete\",0,0)[0]?.json.name || '';\nreturn [{ reply: fileId ? `Are you sure you want to delete '${fname}'? Reply: CONFIRM DELETE ${fname}` : `File not found for delete!`, fileId, fname, user: $json.user }];"
+      },
+      "id": "d2146d81-dbeb-46c6-b8d4-d950aa1e1ec5",
+      "name": "Ask Confirm Delete",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [384, 368]
+    },
+    {
+      "parameters": {
+        "functionCode": "const arr=($json.raw||'').split(' ');\nconst fname=arr.slice(2).join(' ');\nreturn [{ fname,user:$json.user }];"
+      },
+      "id": "93b41804-1957-4b87-a115-a0659a5c177d",
+      "name": "Parse Confirm Delete",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [-80, 496]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "list",
+        "options": {}
+      },
+      "id": "ab65a23b-4e54-4340-a18b-87d4460f8f8c",
+      "name": "Find Confirm File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [160, 496],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "__REPLACE_WITH_YOUR_DRIVE_ID__",
+          "name": "__REPLACE_WITH_DRIVE_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "delete",
+        "fileId": "={{ $items(\"Find Confirm File\",0,0)[0]?.json.id || '' }}"
+      },
+      "id": "b8261e50-7a95-4ac7-8296-1d9a0f42d824",
+      "name": "Delete File (Google Drive)",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [384, 496],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "__REPLACE_WITH_YOUR_DRIVE_ID__",
+          "name": "__REPLACE_WITH_DRIVE_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ reply: 'File deleted!', user: $json.user }];"
+      },
+      "id": "9d25cd6e-a0d8-4321-8dd9-2b716344c5a1",
+      "name": "Delete Reply",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [608, 496]
+    },
+    {
+      "parameters": {
+        "functionCode": "const [folder, ...fnameArr] = ($json.arg || '').split('/').filter(Boolean);\nconst fname = fnameArr.join('/');\nreturn [{\n  folder,\n  fname,\n  user: $node[\"Parse Command\"].json.user // always forward!\n}];\n"
+      },
+      "id": "2bd311bf-8cb5-4751-9ac4-6a0bc26cb06d",
+      "name": "Parse Summary",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [-80, 640]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "list",
+        "options": {}
+      },
+      "id": "1e792874-226c-4c36-9b60-e597b542ab79",
+      "name": "Find File for Summary",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [160, 640],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "__REPLACE_WITH_YOUR_DRIVE_ID__",
+          "name": "__REPLACE_WITH_DRIVE_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "download",
+        "fileId": {"__rl": true, "value": "={{ $json.fileId }}", "mode": "id"},
+        "options": {}
+      },
+      "id": "bd673978-d2aa-4a09-a9e3-35728648e507",
+      "name": "Download For Summary",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 1,
+      "position": [592, 640],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "__REPLACE_WITH_YOUR_DRIVE_ID__",
+          "name": "__REPLACE_WITH_DRIVE_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Try to get a file name from previous node output\nconst fileName = $json.fileName || $json.fname || $json.name || 'Unknown file';\nconst user = $node[\"Parse Command\"].json.user;\nlet textPreview = '';\nif ($binary && $binary.data && $binary.data.data) {\n  try {\n    textPreview = Buffer.from($binary.data.data).toString('utf-8').slice(0, 2000);\n    if (!textPreview.trim() || /^[\\u0000-\\u0020]+$/.test(textPreview)) textPreview = '';\n  } catch(e) {\n    textPreview = '';\n  }\n}\nconst safeText = textPreview || \"I apologize for the mistake! Please provide the document you'd like me to summarize, and I'll be happy to assist you in condensing it into 5 bullet points.\";\nreturn [{ fileName, user, textForAI: safeText }];"
+      },
+      "id": "7180d865-704e-40be-86b0-fa6985ad8b80",
+      "name": "Extract Text for AI",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [816, 640]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={ \"model\": \"llama3-70b-8192\", \"messages\": [ { \"role\": \"system\", \"content\": \"You are an assistant. Summarize the following document in 5 bullet points.\" }, { \"role\": \"user\", \"content\": \"{{$json['textForAI']}}\" } ], \"temperature\": 0.2, \"max_tokens\": 400 }",
+        "headerParametersJson": "{ \"Authorization\": \"Bearer __REPLACE_WITH_YOUR_GROQ_API_KEY__\", \"Content-Type\": \"application/json\" }"
+      },
+      "id": "3615e5e7-e588-4137-8f37-29bb60bab62e",
+      "name": "Groq AI Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [1040, 640]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{\n  reply: `${$json.fileName}\\n${$json.choices?.[0]?.message?.content||'Error getting summary.'}`,\n  user: $node[\"Parse Command\"].json.user\n}];"
+      },
+      "id": "2308ca95-bfe5-44f3-9106-cb5b55f77e97",
+      "name": "Format AI Summary",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1232, 640]
+    },
+    {
+      "parameters": {
+        "from": "+14155238886", "to": "={{ $json.user.replace('whatsapp:', '').replace(/\\s/g,'') }}",
+        "toWhatsapp": true,
+        "message": "={{ $json.reply }}",
+        "options": {}
+      },
+      "id": "0e402573-3804-4204-977a-c91a204c3427",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1552, 256],
+      "credentials": {
+        "twilioApi": {
+          "id": "__REPLACE_WITH_YOUR_TWILIO_ID__",
+          "name": "__REPLACE_WITH_TWILIO_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "__REPLACE_WITH_YOUR_SHEET_ID__",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/__REPLACE_WITH_YOUR_SHEET_ID__/edit#gid=0"
+        },
+        "dataMode": "autoMapInputData",
+        "options": {}
+      },
+      "id": "10fb2ea7-3ecc-43b2-b3bc-871e16b03787",
+      "name": "Log to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [1760, 256],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "__REPLACE_WITH_YOUR_SHEETS_ID__",
+          "name": "__REPLACE_WITH_SHEETS_CRED_NAME__"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const files = $items(\"Find File for Summary\", 0, 0)\n  .filter(f => /pdf|docx|txt/i.test(f.json.name || \"\"));\nconst firstFive = files.slice(0, 5);\nreturn firstFive.map(f => ({\n  fileId: f.json.id,\n  fileName: f.json.name,\n  user: $node[\"Parse Command\"].json.user\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [368, 640],
+      "id": "6f680cbf-a21a-4fb6-b6d9-29f9d352a4ee",
+      "name": "between"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    ... // Unchanged from your original for brevity
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "057527e3-1469-462a-84e7-92d5e43c97f7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1589ecd019e41c4641f8a091986ed37c118f2329f5864e6cca6043bac9d693d9"
+  },
+  "id": "N1Gtqcgp76r6mEdZ",
+  "tags": []
+}

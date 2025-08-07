@@ -1,0 +1,15 @@
+# Ignore n8n local data
+.n8n/
+
+# Ignore environment/credentials
+*.env
+credentials.json
+*.key
+*.pem
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
